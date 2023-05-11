@@ -5,6 +5,7 @@ char *data;  // data segment
 
 int  *pc,    // program counter
      *sp,    // rsp register
+     *bp;    // rbp register
 
 int ax;      // common register
 
