@@ -1,3 +1,8 @@
+#include <stdint.h>
+#include <string.h>
+
+#define int int64_t
+
 int  *code,  // code segment
      *stack; // stack segment
 
@@ -7,7 +12,7 @@ int  *pc,    // program counter
      *sp,    // rsp register
      *bp;    // rbp register
 
-int ax;      // common register
+int   ax;    // common register
 
 // classes or keywords
 enum {Num = 128, Fun, Sys, Glb, Lcl, Id, Char, Int, Enum, If, Else, Return, Sizeof, While,
@@ -59,7 +64,7 @@ void tokenize() {
         // handle number
         else if (token >= '0' && token <= '9') {
             // DEC, 1-9
-            if (token_val = token - '0')
+            if ((token_val = token - '0'))
                 while (*src >= '0' && *src <= '9') token_val = token_val * 10 + *src++ - '0';
             // HEX, 0x
             else if (*src == 'x' || *src == 'X')
@@ -110,4 +115,9 @@ void tokenize() {
         else if (token == '?') {token = Cond; return;}
         else if (token == '~' || token == ';' || token == '{' || token == '}' || token == '(' || token == ')' || token == ']' || token == ',' || token == ':') return;
     }
+}
+
+int main() {
+
+    return 0;
 }
