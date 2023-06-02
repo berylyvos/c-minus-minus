@@ -117,6 +117,78 @@ void tokenize() {
     }
 }
 
+void assert(int tk) {
+    if (token != tk) {
+        printf("line %lld: expect token: %lld(%c), get: %lld(%c)\n", line, tk, (char)tk, token, (char)token);
+        exit(-1);
+    }
+    tokenize();
+}
+
+void check_local_id() {
+    if (token != Id) {printf("line %lld: invalid identifer\n", line); exit(-1);}
+    if (sym_ptr[Class] == Lcl) {
+        printf("line %lld: duplicate declaration\n", line);
+        exit(-1);
+    }
+}
+
+void check_new_id() {
+    if (token != Id) {printf("line %lld: invalid identifer\n", line); exit(-1);}
+    if (sym_ptr[Class]) {
+        printf("line %lld: duplicate declaration\n", line);
+        exit(-1);
+    }
+}
+
+void parse_enum();
+int parse_base_type();
+
+void parse_param();
+void parse_expr();
+void parse_stmt();
+void parse_func();
+
+void parse() {
+    int type, base_type;
+    line = 1; token = 1;
+    while (token > 0) {
+        tokenize();
+        // parse enum
+        if (token == Enum) {
+            assert(Enum);
+            if (token != '{') assert(Id);
+            assert('{'); parse_enum(); assert('}');
+        } else if (token == Int || token == Char) {
+            base_type = parse_base_type();
+            // parse var or func definition
+            while (token != ';' && token != '}') {
+                // parse pointer's star
+                type = base_type;
+                while (token == Mul) {assert(Mul); type = type + PTR;}
+                check_new_id();
+                assert(Id);
+                sym_ptr[Type] = type;
+                if (token == '(') {
+                    // func
+                    sym_ptr[Class] = Fun;
+                    sym_ptr[Value] = (int)(code + 1);
+                    assert('('); parse_param(); assert(')'); assert('{');
+                    parse_func();
+                } else {
+                    // var
+                    sym_ptr[Class] = Glb;
+                    sym_ptr[Value] = (int)data;
+                    data = data + 8;
+                }
+                // handle int a, b,...;
+                if (token == ',') assert(',');
+            }
+            
+        }
+    }
+}
+
 int main() {
 
     return 0;
