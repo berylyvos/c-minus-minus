@@ -15,7 +15,7 @@ int  *pc,    // program counter
 int   ax;    // common register
 
 // classes or keywords
-enum {Num = 128, Fun, Sys, Glb, Lcl, Id, Char, Int, Enum, If, Else, Return, Sizeof, While,
+enum {Num = 0x80, Fun, Sys, Glb, Lcl, Id, Char, Int, Enum, If, Else, Return, Sizeof, While,
     // operators in precedence order
     Assign, Cond, Lor, Land, Or, Xor, And, Eq, Ne, Lt, Gt, Le, Ge,
     Shl, Shr, Add, Sub, Mul, Div, Mod, Inc, Dec, Brak};
