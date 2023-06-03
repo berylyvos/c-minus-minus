@@ -1,7 +1,6 @@
 # c-minus-minus
 
-- lexical analysis
-- syntax & semantic analysis
-- code generation
+- Lexical & Syntax & Semantic Analysis
+- Code Generation
 - NO OPTIMIZATION
-- emulator
+- Virtual Machine
