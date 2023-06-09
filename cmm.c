@@ -3,6 +3,8 @@
 
 #define int int64_t
 
+int MAX_SIZE;
+
 int  *code,  // code segment
      *stack; // stack segment
 
@@ -13,6 +15,11 @@ int  *pc,    // program counter
      *bp;    // rbp register
 
 int   ax;    // common register
+
+// instruction set: copy from c4, change JSR/ENT/ADJ/LEV/BZ/BNZ to CALL/NVAR/DARG/RET/JZ/JNZ.
+enum {IMM, LEA, JMP, JZ, JNZ, CALL, NVAR, DARG, RET, LI, LC, SI, SC, PUSH,
+    OR, XOR, AND, EQ, NE, LT, GT, LE, GE, SHL, SHR, ADD, SUB, MUL, DIV, MOD,
+    OPEN, READ, CLOS, PRTF, MALC, FREE, MSET, MCMP, EXIT};
 
 // classes or keywords
 enum {Num = 0x80, Fun, Sys, Glb, Lcl, Id, Char, Int, Enum, If, Else, Return, Sizeof, While,
@@ -187,6 +194,70 @@ void parse() {
             
         }
     }
+}
+
+int init_vm() {
+    // allocate memory for vm
+    if (!(code = malloc(MAX_SIZE))) {
+        printf("could not malloc(%lld) for code segment\n", MAX_SIZE);
+        return -1;
+    }
+    if (!(data = malloc(MAX_SIZE))) {
+        printf("could not malloc(%lld) for data segment\n", MAX_SIZE);
+        return -1;
+    }
+    if (!(stack = malloc(MAX_SIZE))) {
+        printf("could not malloc(%lld) for stack segment\n", MAX_SIZE);
+        return -1;
+    }
+    if (!(sym_tbl = malloc(MAX_SIZE / 16))) {
+        printf("could not malloc(%lld) for symbol table\n", MAX_SIZE);
+        return -1;
+    }
+    memset(code, 0, MAX_SIZE);
+    memset(data, 0, MAX_SIZE);
+    memset(stack, 0, MAX_SIZE);
+    memset(sym_tbl, 0, MAX_SIZE / 16);
+    return 0;
+}
+
+int run_vm(int argc, char** argv) {
+    int op;
+    int *tmp;
+    
+    while (1) {
+        op = *pc++;
+        // load & save
+        if (op == IMM)          ax = *pc++;                     // load immediate(or global addr)
+        else if (op == LEA)     ax = (int)(bp + *pc++);         // load local addr
+        else if (op == LC)      ax = *(char*)ax;                // load char
+        else if (op == LI)      ax = *(int*)ax;                 // load int
+        else if (op == SC)      *(char*)*sp = ax;               // save char to sp point to
+        else if (op == SI)      *(int*)*sp = ax;                // save int to sp point to
+        else if (op == PUSH)    *--sp = ax;                     // push ax to sp
+        // jump
+        else if (op == JMP)     pc = (int*)*pc;
+        else if (op == JZ)      pc = ax ? pc + 1 : (int*)*pc;
+        else if (op == JNZ)     pc = ax ? (int*)*pc : pc + 1;
+        // arithmetic & bit
+        else if (op == OR)      ax = *sp++ |  ax;
+        else if (op == XOR)     ax = *sp++ ^  ax;
+        else if (op == AND)     ax = *sp++ &  ax;
+        else if (op == EQ)      ax = *sp++ == ax;
+        else if (op == NE)      ax = *sp++ != ax;
+        else if (op == LT)      ax = *sp++ <  ax;
+        else if (op == LE)      ax = *sp++ <= ax;
+        else if (op == GT)      ax = *sp++ >  ax;
+        else if (op == GE)      ax = *sp++ >= ax;
+        else if (op == SHL)     ax = *sp++ << ax;
+        else if (op == SHR)     ax = *sp++ >> ax;
+        else if (op == ADD)     ax = *sp++ +  ax;
+        else if (op == SUB)     ax = *sp++ -  ax;
+        else if (op == MUL)     ax = *sp++ *  ax;
+        else if (op == DIV)     ax = *sp++ /  ax;
+        else if (op == MOD)     ax = *sp++ %  ax;
+    }
+    return 0;
 }
 
 int main() {
