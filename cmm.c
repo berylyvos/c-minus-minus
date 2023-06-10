@@ -14,7 +14,8 @@ int  *pc,    // program counter
      *sp,    // rsp register
      *bp;    // rbp register
 
-int   ax;    // common register
+int   ax,    // common register
+      cycle;
 
 // instruction set: copy from c4, change JSR/ENT/ADJ/LEV/BZ/BNZ to CALL/NVAR/DARG/RET/JZ/JNZ.
 enum {IMM, LEA, JMP, JZ, JNZ, CALL, NVAR, DARG, RET, LI, LC, SI, SC, PUSH,
@@ -224,9 +225,10 @@ int init_vm() {
 int run_vm(int argc, char** argv) {
     int op;
     int *tmp;
-    
+    cycle = 0;
     while (1) {
-        op = *pc++;
+        // read next instruction
+        cycle++; op = *pc++;
         // load & save
         if (op == IMM)          ax = *pc++;                     // load immediate(or global addr)
         else if (op == LEA)     ax = (int)(bp + *pc++);         // load local addr
@@ -256,6 +258,26 @@ int run_vm(int argc, char** argv) {
         else if (op == MUL)     ax = *sp++ *  ax;
         else if (op == DIV)     ax = *sp++ /  ax;
         else if (op == MOD)     ax = *sp++ %  ax;
+        // some complicate instructions for function call
+        // call function: push pc + 1 to stack, pc jump to func addr(pc point to)
+        else if (op == CALL)    {*--sp = (int)(pc+1); pc = (int*)*pc;}
+        // new stack frame for vars: save caller's bp, callee's sp as the new bp, add stack frames for vars 
+        else if (op == NVAR)    {*--sp = (int)bp; bp = sp; sp = sp - *pc++;}
+        // delete stack frame for args: same as x86: add esp, <size>
+        else if (op == DARG)    {sp = sp + *pc++;}
+        // return to caller: restore stack and caller's bp, pc point to caller's next code addr
+        else if (op == RET)     {sp = bp; bp = (int*)*sp++; pc = (int*)*sp++;}
+        // native call
+        else if (op == OPEN)    {ax = open((char*)sp[1], sp[0]);}
+        else if (op == CLOS)    {ax = close(*sp);}
+        else if (op == READ)    {ax = read(sp[2], (char*)sp[1], *sp);}
+        else if (op == PRTF)    {tmp = sp + pc[1] - 1; ax = printf((char*)tmp[0], tmp[-1], tmp[-2], tmp[-3], tmp[-4], tmp[-5]);}
+        else if (op == MALC)    {ax = (int)malloc(*sp);}
+        else if (op == FREE)    {free((void*)*sp);}
+        else if (op == MSET)    {ax = (int)memset((char*)sp[2], sp[1], *sp);}
+        else if (op == MCMP)    {ax = memcmp((char*)sp[2], (char*)sp[1], *sp);}
+        else if (op == EXIT)    {printf("exit(%lld)\n", *sp); return *sp;}
+        else {printf("unkown instruction: %lld, cycle: %lld\n", op, cycle); return -1;}
     }
     return 0;
 }
