@@ -8,7 +8,7 @@
 #### CMM Grammer
 - program: {global_decl}
 - global_decl: var_decl | func_decl
-- var_decl: type [`*`] Id [`,` [`*`] Id] `;`
+- var_decl: type [`*`] Id [`,` [`*`] Id] `;` | enum_decl
 - func_decl: type [`*`] Id `(` param_decl `)` `{` {stmt} `}`
 - param_decl: type [`*`] Id [`,` type [`*`] Id]
 - stmt: if_stmt | while_stmt | return_stmt | empty_stmt | normal_stmt
