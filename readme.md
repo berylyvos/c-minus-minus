@@ -1,14 +1,15 @@
 # c-minus-minus
 
 ## How It Works
-- Front & Back end in one
+### Front & Back end in one
   + NO OPTIMIZATION
-- One-pass Parser
+### One-pass Parser
   + source code stream -> parse & codegen -> VM code
-- Minimalist Virtual Machine
-  + Calculations based on stack and registers
-  + Register: `pc` | `sp` | `bp` | `ax`
-  + Memory: `code` | `data` | `stack`
+### Minimalist Virtual Machine
+  + Register
+    - `pc` | `sp` | `bp` | `ax`
+  + Memory
+    - `code` | `data` | `stack`
   + Instruction Set
     - Save & Load: `IMM` | `LEA` | `LC` | `SC` | `LI` | `SI` | `PUSH`
     - Arithmetic & Logical Operations: `ADD` | `SUB` | `MUL` | `DIV` | `MOD` | `OR` | `XOR` | `AND` | `SHL` | `SHR` | `EQ` | `NE` | `LT` | `LE` | `GT` | `GE`
