@@ -4,7 +4,17 @@
 ### Front & Back end in one
   + NO OPTIMIZATION
 ### One-pass Parser
-  + source code stream -> parse & codegen -> VM code
+  + source code -> |Lexer| -> token stream -> |Parser| -> VM code
+#### CMM Grammer
+- program: {global_decl}
+- global_decl: var_decl | func_decl
+- var_decl: type [`*`] Id [`,` [`*`] Id] `;`
+- func_decl: type [`*`] Id `(` param_decl `)` `{` {stmt} `}`
+- param_decl: type [`*`] Id [`,` type [`*`] Id]
+- stmt: if_stmt | while_stmt | return_stmt | empty_stmt | normal_stmt
+- normal_stmt: expression `;`
+- type: `char` | `int`
+
 ### Minimalist Virtual Machine
   + Register
     - `pc` | `sp` | `bp` | `ax`
