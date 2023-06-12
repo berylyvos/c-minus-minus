@@ -7,9 +7,10 @@
   + source code -> |Lexer| -> token stream -> |Parser| -> VM code
 #### CMM Grammer
 - program: {global_decl}
-- global_decl: var_decl | func_decl
-- var_decl: type [`*`] Id [`,` [`*`] Id] `;` | enum_decl
-- func_decl: type [`*`] Id `(` param_decl `)` `{` {stmt} `}`
+- global_decl: var_decl | enum_decl | func_decl
+- var_decl: type [`*`] Id [`,` [`*`] Id] `;`
+- enum_decl: `enum` [Id] `{` Id [`=` `num`] [`,` Id [`=` `num`]] `}` `;`
+- func_decl: type [`*`] Id `(` param_decl `)` `{` {var_decl}, {stmt} `}`
 - param_decl: type [`*`] Id [`,` type [`*`] Id]
 - stmt: if_stmt | while_stmt | return_stmt | empty_stmt | normal_stmt
 - normal_stmt: expression `;`
