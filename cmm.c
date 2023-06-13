@@ -182,8 +182,151 @@ void parse_enum() {
     }
 }
 
-void parse_param();
-void parse_expr();
+void parse_param() {
+    int type, i;
+    i = 0;
+    while (token != ')') {
+        type = parse_base_type();
+        while (token == Mul) {assert(Mul); type = type + PTR;}
+        check_local_id(); assert(Id);
+        hide_global();
+        sym_ptr[Class] = Lcl;
+        sym_ptr[Type] = type;
+        sym_ptr[Value] = i++;
+        if (token == ',') assert(',');
+    }
+    ibp = ++i;
+}
+
+int type; // pass type in recursive parse_expr()
+void parse_expr(int prec) {
+    int tmp_type, i;
+    int *tmp_ptr;
+    // const number
+    if (token == Num) {
+        tokenize();
+        *++code = IMM;
+        *++code = token_val;
+        type = INT;
+    }
+    // const string
+    else if (token == '"') {
+        *++code = IMM;
+        *++code = token_val;
+        assert('"'); while (token == '"') assert('"'); // multi-rows
+        data = (char*)((int)data + 8 & -8); // add '\0' for string & align 8
+        type = PTR;
+    }
+    else if (token == Sizeof) {
+        tokenize(); assert('(');
+        type = parse_base_type();
+        while (token == Mul) {assert(Mul); type = type + PTR;}
+        assert(')');
+        *++code = IMM;
+        *++code = (type == CHAR) ? 1 : 8;
+        type = INT;
+    }
+    // handle identifer: var or func
+    else if (token == Id) {
+        tokenize();
+        tmp_ptr = sym_ptr;
+        // func call
+        if (token == '(') {
+            assert('(');
+            i = 0;
+            while (token != ')') {
+                parse_expr(Assign);
+                *++code = PUSH; i++;
+                if (token == ',') assert(',');
+            } assert(')');
+            // native call
+            if (tmp_ptr[Class] == Sys) *++code = tmp_ptr[Value];
+            // func
+            else if (tmp_ptr[Class] = Fun) {*++code = CALL; *++code = tmp_ptr[Value];}
+            else {printf("line %lld: invalid function call\n", line); exit(-1);}
+            // delete stack frame for args
+            if (i > 0) {*++code = DARG; *++code = i;}
+            type = tmp_ptr[Type];
+        }
+        // handle enum val
+        else if (tmp_ptr[Class] == Num) {
+            *++code = IMM; *++code = tmp_ptr[Value]; type = INT;
+        }
+        // handle vars
+        else {
+            // local var, calculate addr base ibp
+            if (tmp_ptr[Class] == Lcl) {*++code = LEA; *++code = ibp - tmp_ptr[Value];}
+            // global var
+            else if (tmp_ptr[Class] == Glb) {*++code = IMM; *++code = tmp_ptr[Value];}
+            else {printf("line %lld: invalid variable\n", line); exit(-1);}
+            type = tmp_ptr[Type];
+            *++code = (type == CHAR) ? LC : LI;
+        }
+    }
+    // cast or parenthesis
+    else if (token == '(') {
+        assert('(');
+        if (token == Char || token == Int) {
+            tokenize();
+            tmp_type = token - Char + CHAR;
+            while (token == Mul) {assert(Mul); tmp_type = tmp_type + PTR;}
+            // use precedence Inc represent all unary operators
+            assert(')'); parse_expr(Inc); type = tmp_type;
+        } else {
+            parse_expr(Assign); assert(')');
+        }
+    }
+    // dereference
+    else if (token == Mul) {
+        tokenize(); parse_expr(Inc);
+        if (type >= PTR) type = type - PTR;
+        else {printf("line %lld: invalid dereference\n", line); exit(-1);}
+        *++code = (type == CHAR) ? LC : LI;
+    }
+    // reference
+    else if (token == And) {
+        tokenize(); parse_expr(Inc);
+        if (*code == LC || *code == LI) code--; // rollback load by addr
+        else {printf("line %lld: invalid reference\n", line); exit(-1);}
+        type = type + PTR;
+    }
+    // Not
+    else if (token == '!') {
+        tokenize(); parse_expr(Inc);
+        // <expr> == 0
+        *++code = PUSH; *++code = IMM; *++code = 0; *++code = EQ;
+        type = INT;
+    }
+    // bitwise not
+    else if (token == '~') {
+        tokenize(); parse_expr(Inc);
+        // <expr> ^ 0xFFFF
+        *++code = PUSH; *++code = IMM; *++code = -1; *++code = XOR;
+        type = INT;
+    }
+    // +var
+    else if (token == Add) {tokenize(); parse_expr(Inc); type = INT;}
+    // -var
+    else if (token == Sub) {
+        tokenize(); parse_expr(Inc);
+        *++code = PUSH; *++code = IMM; *++code = -1; *++code = MUL;
+        type = INT;
+    }
+    // ++var --var
+    else if (token == Inc || token == Dec) {
+        i = token; tokenize(); parse_expr(Inc);
+        // save var addr, then load var value
+        if (*code == LC) {*code = PUSH; *++code = LC;}
+        else if (*code == LI) {*code = PUSH; *++code = LI;}
+        else {printf("line %lld: invalid Inc or Dec\n", line); exit(-1);}
+        *++code = PUSH; // save var value
+        *++code = IMM; *++code = (type > PTR) ? 8 : 1;
+        *++code = (i == Inc) ? ADD : SUB; // ++ or --
+        *++code = (type == CHAR) ? SC : SI; // write back to var addr
+    }
+    else {printf("line %lld: invalid expression\n", line); exit(-1);}
+    // TODO binary operators
+}
 
 void parse_stmt() {
     int *a;
