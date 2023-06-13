@@ -12,7 +12,7 @@
 - enum_decl: `enum` [Id] `{` Id [`=` `num`] [`,` Id [`=` `num`]] `}` `;`
 - func_decl: type [`*`] Id `(` param_decl `)` `{` {var_decl}, {stmt} `}`
 - param_decl: type [`*`] Id [`,` type [`*`] Id]
-- stmt: if_stmt | while_stmt | return_stmt | empty_stmt | normal_stmt
+- stmt: `{` stmt `}` | if_stmt | while_stmt | return_stmt | empty_stmt | normal_stmt
 - normal_stmt: expression `;`
 - type: `char` | `int`
 

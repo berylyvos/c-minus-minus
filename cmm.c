@@ -15,6 +15,7 @@ int  *pc,    // program counter
      *bp;    // rbp register
 
 int   ax,    // common register
+      ibp,
       cycle;
 
 // instruction set: copy from c4, change JSR/ENT/ADJ/LEV/BZ/BNZ to CALL/NVAR/DARG/RET/JZ/JNZ.
@@ -149,13 +150,124 @@ void check_new_id() {
     }
 }
 
-void parse_enum();
-int parse_base_type();
+void hide_global() {
+    sym_ptr[GClass] = sym_ptr[Class];
+    sym_ptr[GType] = sym_ptr[Type];
+    sym_ptr[GValue] = sym_ptr[Value];
+}
+
+void recover_global() {
+    sym_ptr[Class] = sym_ptr[GClass];
+    sym_ptr[Type] = sym_ptr[GType];
+    sym_ptr[Value] = sym_ptr[GValue];
+}
+
+int parse_base_type() {
+    if (token == Char) {assert(Char); return CHAR;}
+    else {assert(Int); return INT;}
+}
+
+void parse_enum() {
+    int i;
+    i = 0;
+    while (token != '}') {
+        check_new_id();
+        assert(Id);
+        // handle custom enum index
+        if (token == Assign) {assert(Assign); assert(Num); i = token_val;}
+        sym_ptr[Class] = Num;
+        sym_ptr[Type] = INT;
+        sym_ptr[Value] = i++;
+        if (token == ',') tokenize();
+    }
+}
 
 void parse_param();
 void parse_expr();
-void parse_stmt();
-void parse_func();
+
+void parse_stmt() {
+    int *a;
+    int *b;
+    //     <cond>
+    //     JZ a
+    //     <true-stmt>
+    //     JMP b
+    //     a:
+    //     <false-stmt>
+    //     b:
+    if (token == If) {
+        assert(If); assert('('); parse_expr(Assign); assert(')');
+        *++code = JZ; a = ++code; // JZ to false
+        parse_stmt(); // true stmt
+        if (token == Else) {
+            assert(Else);
+            *a = (int)(code + 3); // false point
+            *++code = JMP; b = ++code; // JMP to endif
+            parse_stmt(); // false stmt
+        }
+        *b = (int)(code + 1); // endif point
+    }
+    //     a:
+    //     <cond>
+    //     JZ b
+    //     <loop-stmt>
+    //     JMP a
+    //     b:
+    else if (token == While) {
+        assert(While);
+        a = code + 1; // entry point
+        assert('('); parse_expr(Assign); assert(')');
+        *++code = JZ; b = ++code; // JZ to endloop
+        parse_stmt();
+        *++code = JMP; *++code = (int)a; // JMP to entry point
+        *b = (int)(code + 1); // endloop   
+    }
+    else if (token == Return) {
+        assert(Return);
+        if (token != ';') parse_expr(Assign);
+        assert(';');
+        *++code = RET;
+    }
+    else if (token == '{') {
+        assert('{');
+        while (token != '}') parse_stmt(Assign);
+        assert('}');
+    }
+    else if (token == ';') assert(';');
+    else {parse_expr(Assign); assert(';');}
+}
+
+void parse_func() {
+    int type, i;
+    i = ibp;
+    // local vars must be declare in advance
+    while (token == Char || token == Int) {
+        type = parse_base_type();
+        while (token != ';') {
+            while (token == Mul) {assert(Mul); type = type + PTR;}
+            check_local_id(); assert(Id);
+            hide_global();
+            sym_ptr[Class] = Lcl;
+            sym_ptr[Type] = type;
+            sym_ptr[Value] = ++i;
+            if (token == ',') assert(',');
+        }
+        assert(';');
+    }
+    // new stack frames for local vars
+    *++code = NVAR;
+    *++code = i - ibp;
+    // parse statements
+    while (token != '}') parse_stmt();
+    // if void, add return
+    if (*code != RET) *++code = RET;
+    // recover global vars from local vars
+    sym_ptr = sym_tbl;
+    while (sym_ptr[Token]) {
+        if (sym_ptr[Class] == Lcl) recover_global();
+        sym_ptr = sym_ptr + SymSize;
+    }
+}
 
 void parse() {
     int type, base_type;
