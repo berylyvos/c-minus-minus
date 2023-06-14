@@ -325,7 +325,86 @@ void parse_expr(int prec) {
         *++code = (type == CHAR) ? SC : SI; // write back to var addr
     }
     else {printf("line %lld: invalid expression\n", line); exit(-1);}
-    // TODO binary operators
+    // handle binary or postfix operators
+    while (token >= prec) {
+        tmp_type = type;
+        if (token == Assign) {
+            tokenize();
+            if (*code == LC || *code == LI) *code = PUSH;
+            else {printf("line %lld: invalid assignment\n", line); exit(-1);}
+            parse_expr(Assign); type = tmp_type;
+            *++code = (type == CHAR) ? SC : SI;
+        }
+        // '<expr> ? a : b', as same sa If stmt
+        else if (token == Cond) {
+            tokenize(); *++code = JZ; tmp_ptr = ++code;
+            parse_expr(Assign); assert(':');
+            *tmp_ptr = (int)(code + 3);
+            *++code = JMP; tmp_ptr = ++code;
+            parse_expr(Cond);
+            *tmp_ptr = (int)(code + 1);
+        }
+        // logic operators: ||, &&
+        else if (token == Lor) {
+            tokenize(); *++code = JNZ; tmp_ptr = ++code;
+            parse_expr(Land); *tmp_ptr = (int)(code + 1);
+            type = INT;
+        }
+        else if (token == Land) {
+            tokenize(); *++code = JZ; tmp_ptr = ++code;
+            parse_expr(Or); *tmp_ptr = (int)(code + 1);
+            type = INT;
+        }
+        // arithmetic operators: |, ^, &, ==, != <=, >=, <, >, <<, >>
+        else if (token == Or)  {tokenize(); *++code = PUSH; parse_expr(Xor); *++code = OR;  type = INT;}
+        else if (token == Xor) {tokenize(); *++code = PUSH; parse_expr(And); *++code = XOR; type = INT;}
+        else if (token == And) {tokenize(); *++code = PUSH; parse_expr(Eq);  *++code = AND; type = INT;}
+        else if (token == Eq)  {tokenize(); *++code = PUSH; parse_expr(Lt);  *++code = EQ;  type = INT;}
+        else if (token == Ne)  {tokenize(); *++code = PUSH; parse_expr(Lt);  *++code = NE;  type = INT;}
+        else if (token == Lt)  {tokenize(); *++code = PUSH; parse_expr(Shl); *++code = LT;  type = INT;}
+        else if (token == Gt)  {tokenize(); *++code = PUSH; parse_expr(Shl); *++code = GT;  type = INT;}
+        else if (token == Le)  {tokenize(); *++code = PUSH; parse_expr(Shl); *++code = LE;  type = INT;}
+        else if (token == Ge)  {tokenize(); *++code = PUSH; parse_expr(Shl); *++code = GE;  type = INT;}
+        else if (token == Shl) {tokenize(); *++code = PUSH; parse_expr(Add); *++code = SHL; type = INT;}
+        else if (token == Shr) {tokenize(); *++code = PUSH; parse_expr(Add); *++code = SHR; type = INT;}
+        // +, -, *, /, %
+        else if (token == Add) {
+            tokenize(); *++code = PUSH; parse_expr(Mul);
+            // int pointer, *8
+            if (tmp_type > PTR) {*++code = PUSH; *++code = IMM; *++code = 8; *++code = MUL;}
+            *++code = ADD;
+            type = tmp_type;
+        }
+        else if (token == Sub) {
+            tokenize(); *++code = PUSH; parse_expr(Mul);
+            if (tmp_type > PTR && tmp_type == type) {
+                // pointer - pointer, div by 8
+                *++code = SUB; *++code = PUSH;
+                *++code = IMM; *++code = 8; *++code = DIV; 
+                type = INT;
+            }
+            else if (tmp_type > PTR) {
+                // pointer - num, p - n*8
+                *++code = PUSH;
+                *++code = IMM; *++code = 8; *++code = MUL;
+                *++code = SUB;
+                type = tmp_type;
+            }
+            else {*++code = SUB;}
+        }
+        else if (token == Mul) {tokenize(); *++code = PUSH; parse_expr(Inc); *++code = MUL; type = INT;}
+        else if (token == Div) {tokenize(); *++code = PUSH; parse_expr(Inc); *++code = DIV; type = INT;}
+        else if (token == Mod) {tokenize(); *++code = PUSH; parse_expr(Inc); *++code = MOD; type = INT;}
+        // var++, var--
+        else if (token == Inc || token == Dec) {
+
+        }
+        // a[x] = *(a + x)
+        else if (token == Brak) {
+
+        }
+        else {printf("%lld: invlid token=%lld\n", line, token); exit(-1);}
+    }
 }
 
 void parse_stmt() {
