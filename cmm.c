@@ -397,11 +397,23 @@ void parse_expr(int prec) {
         else if (token == Mod) {tokenize(); *++code = PUSH; parse_expr(Inc); *++code = MOD; type = INT;}
         // var++, var--
         else if (token == Inc || token == Dec) {
-
+            if (*code == LC) {*code = PUSH; *++code = LC;}
+            else if (*code == LI) {*code = PUSH; *++code = LI;}
+            else {printf("%lld: invlid operator=%lld\n", line, token); exit(-1);}
+            *++code = PUSH; *++code = IMM; *++code = (type > PTR) ? 8 : 1;
+            *++code = (token == Inc) ? ADD : SUB;
+            *++code = (type == CHAR) ? SC : SI;
+            *++code = PUSH; *++code = IMM; *++code = (type > PTR) ? 8 : 1;
+            *++code = (token == Inc) ? SUB : ADD; // restore the original var to ax
+            tokenize();
         }
         // a[x] = *(a + x)
         else if (token == Brak) {
-
+            assert(Brak); *++code = PUSH; parse_expr(Assign); assert(']');
+            if (tmp_type > PTR) {*++code = PUSH; *++code = IMM; *++code = 8; *++code = MUL;}
+            else if (tmp_type < PTR) {printf("line %lld: invalid index op\n", line); exit(-1);}
+            *++code = ADD; type = tmp_type - PTR;
+            *++code = (type == CHAR) ? LC : LI;
         }
         else {printf("%lld: invlid token=%lld\n", line, token); exit(-1);}
     }
