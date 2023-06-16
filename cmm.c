@@ -660,14 +660,16 @@ void keywords() {
 }
 
 char *inst;
-void write_asm() {
+void write_asm(char *src_path) {
     int fd;
-    char *buf;
+    char *buf, *name;
     inst = "IMM ,LEA ,JMP ,JZ  ,JNZ ,CALL,NVAR,DARG,RET ,LI  ,LC  ,SI  ,SC  ,PUSH,"
         "OR  ,XOR ,AND ,EQ  ,NE  ,LT  ,GT  ,LE  ,GE  ,SHL ,SHR ,ADD ,SUB ,MUL ,DIV ,MOD ,"
         "OPEN,READ,CLOS,PRTF,MALC,FREE,MSET,MCMP,EXIT,";
-    fd = open("cmm", 0x0001 | 0x0200);
-    buf = malloc(128);
+    name = (char*)malloc(strlen(src_path) + 5);
+    sprintf(name, "%s%s", src_path, ".asm");
+    fd = open(name, O_CREAT|O_RDWR, S_IRUSR|S_IWUSR);
+    buf = malloc(100);
     while (code_dump < code) {
         sprintf(buf, "(%lld) %8.4s", ++code_dump, inst + (*code_dump * 5));
         write(fd, buf, strlen(buf));
@@ -706,7 +708,7 @@ int32_t main(int32_t argc, char **argv) {
     // parse and generate vm code
     parse();
     // print vm code for debug
-    write_asm();
+    write_asm(*(argv+1));
     // run vm
     return run_vm(--argc, ++argv);
 }
