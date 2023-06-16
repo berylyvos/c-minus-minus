@@ -1,20 +1,26 @@
+#include <fcntl.h>
+#include <unistd.h>
 #include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <memory.h>
 #include <string.h>
 
 #define int int64_t
 
 int MAX_SIZE;
 
-int  *code,  // code segment
-     *stack; // stack segment
+int  *code,         // code segment
+     *code_dump,    // for dump
+     *stack;        // stack segment
 
-char *data;  // data segment
+char *data;         // data segment
 
-int  *pc,    // program counter
-     *sp,    // rsp register
-     *bp;    // rbp register
+int  *pc,           // program counter
+     *sp,           // rsp register
+     *bp;           // rbp register
 
-int   ax,    // common register
+int   ax,           // common register
       ibp,
       cycle;
 
@@ -35,11 +41,11 @@ enum {Token, Hash, Name, Class, Type, Value, GClass, GType, GValue, SymSize};
 // types of var & func in sym_tbl
 enum {CHAR, INT, PTR};
 
-// source code
-char *src;
+// source code & dump
+char *src, *src_dump;
 
 // symbol table, pointers
-int *sym_tbl, *sym_ptr;
+int *sym_tbl, *sym_ptr, *main_ptr;
 
 int token, token_val, line;
 
@@ -242,7 +248,7 @@ void parse_expr(int prec) {
             // native call
             if (tmp_ptr[Class] == Sys) *++code = tmp_ptr[Value];
             // func
-            else if (tmp_ptr[Class] = Fun) {*++code = CALL; *++code = tmp_ptr[Value];}
+            else if (tmp_ptr[Class] == Fun) {*++code = CALL; *++code = tmp_ptr[Value];}
             else {printf("line %lld: invalid function call\n", line); exit(-1);}
             // delete stack frame for args
             if (i > 0) {*++code = DARG; *++code = i;}
@@ -545,7 +551,7 @@ void parse() {
 
 int init_vm() {
     // allocate memory for vm
-    if (!(code = malloc(MAX_SIZE))) {
+    if (!(code = code_dump = malloc(MAX_SIZE))) {
         printf("could not malloc(%lld) for code segment\n", MAX_SIZE);
         return -1;
     }
@@ -572,6 +578,13 @@ int run_vm(int argc, char** argv) {
     int op;
     int *tmp;
     cycle = 0;
+    // exit code for main
+    bp = sp = (int*)((int)stack + MAX_SIZE);
+    *--sp = EXIT;
+    *--sp = PUSH; tmp = sp;
+    *--sp = argc; *--sp = (int)argv;
+    *--sp = (int)tmp;
+    if (!(pc = (int*)main_ptr[Value])) {printf("main function is not defined\n"); exit(-1);}
     while (1) {
         // read next instruction
         cycle++; op = *pc++;
@@ -628,7 +641,72 @@ int run_vm(int argc, char** argv) {
     return 0;
 }
 
-int main() {
+void keywords() {
+    int i;
+    src = "char int enum if else return sizeof while "
+        "open read close printf malloc free memset memcmp exit void main";
+    // add keywords to symbol table
+    i = Char; while (i <= While) {tokenize(); sym_ptr[Token] = i++;}
+    // add Native CALL to symbol table
+    i = OPEN; while (i <= EXIT) {
+        tokenize();
+        sym_ptr[Class] = Sys;
+        sym_ptr[Type] = INT;
+        sym_ptr[Value] = i++;
+    }
+    tokenize(); sym_ptr[Token] = Char; // handle void type
+    tokenize(); main_ptr = sym_ptr; // keep track of main
+    src = src_dump;
+}
 
+char *inst;
+void write_asm() {
+    int fd;
+    char *buf;
+    inst = "IMM ,LEA ,JMP ,JZ  ,JNZ ,CALL,NVAR,DARG,RET ,LI  ,LC  ,SI  ,SC  ,PUSH,"
+        "OR  ,XOR ,AND ,EQ  ,NE  ,LT  ,GT  ,LE  ,GE  ,SHL ,SHR ,ADD ,SUB ,MUL ,DIV ,MOD ,"
+        "OPEN,READ,CLOS,PRTF,MALC,FREE,MSET,MCMP,EXIT,";
+    fd = open("cmm", 0x0001 | 0x0200);
+    buf = malloc(128);
+    while (code_dump < code) {
+        sprintf(buf, "(%lld) %8.4s", ++code_dump, inst + (*code_dump * 5));
+        write(fd, buf, strlen(buf));
+        if (*code_dump < RET) sprintf(buf, " %lld\n", *++code_dump);
+        else {buf[0] = '\n'; buf[1] = '\0';}
+        write(fd, buf, strlen(buf));
+    }
+    close(fd);
+}
+
+int load_src(char* file) {
+    int fd, cnt;
+    if ((fd = open(file, 0)) < 0) {
+        printf("could not open source code(%s)\n", file);
+        return -1;
+    }
+    if (!(src = src_dump = malloc(MAX_SIZE))) {
+        printf("could not malloc(%lld) for source code\n", MAX_SIZE);
+        return -1;
+    }
+    if ((cnt = read(fd, src, MAX_SIZE - 1)) <= 0) {
+        printf("could not read source code(%lld)\n", cnt);
+        return -1;
+    }
+    src[cnt] = 0; // EOF
+    close(fd);
     return 0;
+}
+
+int32_t main(int32_t argc, char **argv) {
+    MAX_SIZE = 1024 * 1024;
+    if (load_src(*(argv+1)) != 0) return -1;
+    if (init_vm() != 0) return -1;
+    // prepare keywords for symbol table
+    keywords();
+    // parse and generate vm code
+    parse();
+    // print vm code for debug
+    write_asm();
+    // run vm
+    return run_vm(--argc, ++argv);
 }
