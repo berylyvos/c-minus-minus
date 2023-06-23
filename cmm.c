@@ -437,11 +437,11 @@ void parse_stmt() {
     //     b:
     if (token == If) {
         assert(If); assert('('); parse_expr(Assign); assert(')');
-        *++code = JZ; a = ++code; // JZ to false
+        *++code = JZ; b = ++code; // JZ to false (or endif if there's no false-stmt)
         parse_stmt(); // true stmt
         if (token == Else) {
             assert(Else);
-            *a = (int)(code + 3); // false point
+            *b = (int)(code + 3); // false point
             *++code = JMP; b = ++code; // JMP to endif
             parse_stmt(); // false stmt
         }
